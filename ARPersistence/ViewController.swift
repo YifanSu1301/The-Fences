@@ -8,6 +8,10 @@ Main view controller for the AR experience.
 import UIKit
 import SceneKit
 import ARKit
+import SwiftUI
+
+
+
 
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     // MARK: - IBOutlets
@@ -74,14 +78,15 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
     /// - Tag: RestoreVirtualContent
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
-        guard anchor.name == virtualObjectAnchorName
+      guard ((anchor.name?.contains("virtualObject")) != nil)
             else { return }
         
         // save the reference to the virtual object anchor when the anchor is added from relocalizing
         if virtualObjectAnchor == nil {
             virtualObjectAnchor = anchor
         }
-        node.addChildNode(virtualObject)
+      let imageName = anchor.name?.replacingOccurrences(of: "virtualObject", with: "")
+        node.addChildNode(creatNode(image: imageName!))
     }
     
     // MARK: - ARSessionDelegate
@@ -232,7 +237,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 
     var defaultConfiguration: ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
-        configuration.planeDetection = .horizontal
+        configuration.planeDetection = .vertical
         configuration.environmentTexturing = .automatic
         return configuration
     }
@@ -286,30 +291,64 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         }
         // Hit test to find a place for a virtual object.
         guard let hitTestResult = sceneView
-            .hitTest(sender.location(in: sceneView), types: [.existingPlaneUsingGeometry, .estimatedHorizontalPlane])
+            .hitTest(sender.location(in: sceneView), types: .existingPlaneUsingGeometry)
             .first
             else { return }
         
         // Remove exisitng anchor and add new anchor
-        if let existingAnchor = virtualObjectAnchor {
-            sceneView.session.remove(anchor: existingAnchor)
-        }
-        virtualObjectAnchor = ARAnchor(name: virtualObjectAnchorName, transform: hitTestResult.worldTransform)
+//        if let existingAnchor = virtualObjectAnchor {
+//            sceneView.session.remove(anchor: existingAnchor)
+//        }
+      let anchorName = virtualObjectAnchorName + imageS
+        virtualObjectAnchor = ARAnchor(name: anchorName, transform: hitTestResult.worldTransform)
         sceneView.session.add(anchor: virtualObjectAnchor!)
+      let _ = creatNode(image: imageList[index%2])
+      index += 1
+      
+//      sceneView.scene.rootNode.addChildNode(newNode)
     }
 
     var virtualObjectAnchor: ARAnchor?
     let virtualObjectAnchorName = "virtualObject"
 
-    var virtualObject: SCNNode = {
-        guard let sceneURL = Bundle.main.url(forResource: "cup", withExtension: "scn", subdirectory: "Assets.scnassets/cup"),
-            let referenceNode = SCNReferenceNode(url: sceneURL) else {
-                fatalError("can't load virtual object")
-        }
-        referenceNode.load()
-        
-        return referenceNode
-    }()
+//    var virtualObject: SCNNode = {
+//        guard let sceneURL = Bundle.main.url(forResource: "cup", withExtension: "scn", subdirectory: "Assets.scnassets/cup"),
+//            let referenceNode = SCNReferenceNode(url: sceneURL) else {
+//                fatalError("can't load virtual object")
+//        }
+//        referenceNode.load()
+//
+//        return referenceNode
+//    }()
+  var index = 0
+  var imageList = ["MAGC", "ScottyLab"]
+  var imageS:String {
+    let i = index % 2
+    if i == 0{
+      return "MAGC"
+    }
+    else {
+      return "ScottyLab"
+    }
+  }
+  
+  
+  func creatNode(image: String) -> SCNNode {
+    let planeGeometry = SCNPlane()
+    let material = SCNMaterial()
     
+    material.diffuse.contents = UIImage(named: image)
+    planeGeometry.materials=[material]
+
+    let paintNode = SCNNode(geometry: planeGeometry)
+    
+  paintNode.eulerAngles = SCNVector3(paintNode.eulerAngles.x + (-Float.pi / 2), paintNode.eulerAngles.y, paintNode.eulerAngles.z)
+    
+    return paintNode
+  }
+  
+  @State var newRoomName:String = ""
+
+  
 }
 
