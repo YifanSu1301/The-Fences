@@ -9,7 +9,10 @@ import UIKit
 import SceneKit
 import ARKit
 import SwiftUI
-
+import Combine
+import Firebase
+import FirebaseFirestoreSwift
+import Foundation
 
 
 
@@ -23,6 +26,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     @IBOutlet weak var loadExperienceButton: UIButton!
     @IBOutlet weak var statusLabel: UILabel!
     @IBOutlet weak var snapshotThumbnail: UIImageView!
+    private var errorMessage = ""
     
     // MARK: - View Life Cycle
     
@@ -167,29 +171,145 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             fatalError("Can't get file save URL: \(error.localizedDescription)")
         }
     }()
+  
+  //function to save roomData
+  func saveRoomData(roomName: String, anchorImage: [String: UIImage]? ){
+    var anchorImg : [String: String] = [:]
+
+    var numAnchor: Int
+    if anchorImage == nil {
+      numAnchor = 0
+    }else{
+      numAnchor = anchorImage!.count
+      
+    }
+    
+  
+    for i in 0..<numAnchor{
+      let ref = FirebaseManager.shared.storage.reference(withPath: UUID().uuidString)
+//      refList.append(ref)
+//      var index = i
+     
+      let index = anchorImage!.index(anchorImage!.startIndex, offsetBy: i)
+      let key = anchorImage!.keys[index]
+      guard let imageData = anchorImage![key]!.jpegData(compressionQuality: 0.5) else{
+        self.errorMessage = "Failed to convert to image data."
+        
+        return
+      }
+      ref.putData(imageData, metadata: nil){ metadata, err in
+        if let err = err {
+          self.errorMessage = "Failed to put image data: \(err)"
+          return
+        }
+        ref.downloadURL { url, err in
+          if let err = err {
+            self.errorMessage = "Failed to download image data: \(err)"
+            return
+          }
+          self.errorMessage = "Failed to convert to image data: \(url?.absoluteString ?? "")"
+  //        print(url?.absoluteString)
+          
+          guard let url = url else { return }
+          anchorImg[key] = url.absoluteString
+          
+        }
+      
+      }
+    }
+      storeRoomInformation(roomName:roomName, anchorImg: anchorImg)
+    
+  }
+  
+    func storeRoomInformation(roomName: String, anchorImg : [String: String]){
+      sceneView.session.getCurrentWorldMap { worldMap, error in
+          guard let map = worldMap
+              else { self.showAlert(title: "Can't get current world map", message: error!.localizedDescription); return }
+          
+          // Add a snapshot image indicating where the map was captured.
+          guard let snapshotAnchor = SnapshotAnchor(capturing: self.sceneView)
+              else { fatalError("Can't take snapshot") }
+          map.anchors.append(snapshotAnchor)
+          
+          do {
+            let ref = FirebaseManager.shared.storage.reference(withPath: UUID().uuidString)
+            
+            let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
+            ref.putData(data, metadata: nil){ metadata, err in
+              if let err = err {
+                self.errorMessage = "Failed to put image data: \(err)"
+                return
+              }
+              ref.downloadURL { url, err in
+                if let err = err {
+                  self.errorMessage = "Failed to download image data: \(err)"
+                  return
+                }
+                self.errorMessage = "Failed to convert to image data: \(url?.absoluteString ?? "")"
+        //        print(url?.absoluteString)
+                
+                guard let url = url else { return }
+                let roomData = ["roomName": roomName,
+                                "createdAt": Timestamp(),
+                                "anchorImg": anchorImg,
+                                "roomARDataURL": url.absoluteString] as [String : Any]
+                let documentID = FirebaseManager.shared.firestore.collection("rooms").document()
+                
+                documentID.setData(roomData){ err in
+                  if let err = err {
+                    print(err)
+                    return
+                  }
+                  print("Success Upload Post!")
+                
+                }
+               
+                
+              }
+            
+            }
+            
+              
+//              try data.write(to: self.mapSaveURL, options: [.atomic])
+              DispatchQueue.main.async {
+                  self.loadExperienceButton.isHidden = false
+                  self.loadExperienceButton.isEnabled = true
+              }
+          } catch {
+              fatalError("Can't save map: \(error.localizedDescription)")
+          }
+      }
+      
+
+
+     
+      
+   
+    }
     
     /// - Tag: GetWorldMap
     @IBAction func saveExperience(_ button: UIButton) {
-        sceneView.session.getCurrentWorldMap { worldMap, error in
-            guard let map = worldMap
-                else { self.showAlert(title: "Can't get current world map", message: error!.localizedDescription); return }
-            
-            // Add a snapshot image indicating where the map was captured.
-            guard let snapshotAnchor = SnapshotAnchor(capturing: self.sceneView)
-                else { fatalError("Can't take snapshot") }
-            map.anchors.append(snapshotAnchor)
-            
-            do {
-                let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
-                try data.write(to: self.mapSaveURL, options: [.atomic])
-                DispatchQueue.main.async {
-                    self.loadExperienceButton.isHidden = false
-                    self.loadExperienceButton.isEnabled = true
-                }
-            } catch {
-                fatalError("Can't save map: \(error.localizedDescription)")
-            }
-        }
+//        sceneView.session.getCurrentWorldMap { worldMap, error in
+//            guard let map = worldMap
+//                else { self.showAlert(title: "Can't get current world map", message: error!.localizedDescription); return }
+//
+//            // Add a snapshot image indicating where the map was captured.
+//            guard let snapshotAnchor = SnapshotAnchor(capturing: self.sceneView)
+//                else { fatalError("Can't take snapshot") }
+//            map.anchors.append(snapshotAnchor)
+//
+//            do {
+//                let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
+//                try data.write(to: self.mapSaveURL, options: [.atomic])
+//                DispatchQueue.main.async {
+//                    self.loadExperienceButton.isHidden = false
+//                    self.loadExperienceButton.isEnabled = true
+//                }
+//            } catch {
+//                fatalError("Can't save map: \(error.localizedDescription)")
+//            }
+//        }
+      saveRoomData(roomName: roomName, anchorImage: anchorImage)
     }
     
     // Called opportunistically to verify that map data can be loaded from filesystem.
@@ -284,6 +404,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     // MARK: - Placing AR Content
     
     /// - Tag: PlaceObject
+  var anchorImage: [String: UIImage] = [:]
     @IBAction func handleSceneTap(_ sender: UITapGestureRecognizer) {
         // Disable placing objects when the session is still relocalizing
         if isRelocalizingMap && virtualObjectAnchor == nil {
@@ -302,6 +423,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
       let anchorName = virtualObjectAnchorName + imageS
         virtualObjectAnchor = ARAnchor(name: anchorName, transform: hitTestResult.worldTransform)
         sceneView.session.add(anchor: virtualObjectAnchor!)
+      anchorImage[anchorName] = Image
       let _ = creatNode(image: imageList[index%2])
       index += 1
       
@@ -358,6 +480,22 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
       }
 
       func updateUIViewController(_ uiViewController: ViewController, context: UIViewControllerRepresentableContext<ViewControllerRepresentation>) {
+
+      }
+  }
+  
+  var roomName: String = ""
+  
+  struct ViewControllerRoomNameRepresentation: UIViewControllerRepresentable {
+      var roomName: String
+
+      func makeUIViewController(context: UIViewControllerRepresentableContext<ViewControllerRoomNameRepresentation>) -> ViewController {
+          let controller = UIStoryboard(name: "Main", bundle: nil).instantiateViewController(withIdentifier: "ViewController") as! ViewController
+          controller.roomName = self.roomName
+          return controller
+      }
+
+      func updateUIViewController(_ uiViewController: ViewController, context: UIViewControllerRepresentableContext<ViewControllerRoomNameRepresentation>) {
 
       }
   }

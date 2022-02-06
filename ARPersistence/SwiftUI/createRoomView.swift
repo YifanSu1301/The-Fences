@@ -10,25 +10,32 @@ import SwiftUI
 
 struct createRoomView: View {
   @State var roomName: String
+
     var body: some View {
       VStack{
         Text("Please enter the name of room:")
         TextField("RoomName", text:$roomName)
-        HStack{
-          Spacer()
-          Button {
+        NavigationView{
+          HStack{
+            Spacer()
             
-          } label: {
-            Text("Confirm")
-          }
-          Spacer()
-          Button {
-            
-          } label: {
-            Text("Cancel")
-          }
-          Spacer()
-        }.padding()
+            NavigationLink {
+              ViewController.ViewControllerRoomNameRepresentation(roomName: roomName)
+            } label: {
+              Text("Confirm")
+            }
+
+           
+            Spacer()
+            NavigationLink {
+              ViewController.ViewControllerRoomNameRepresentation(roomName: "")
+            } label: {
+              Text("Cancel")
+            }
+            Spacer()
+          }.padding()
+        }
+       
         
 
       }
