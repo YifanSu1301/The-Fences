@@ -331,13 +331,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
       return "ScottyLab"
     }
   }
-  
+  var Image: UIImage?
   
   func creatNode(image: String) -> SCNNode {
     let planeGeometry = SCNPlane()
     let material = SCNMaterial()
     
-    material.diffuse.contents = UIImage(named: image)
+    material.diffuse.contents = Image
     planeGeometry.materials=[material]
 
     let paintNode = SCNNode(geometry: planeGeometry)
@@ -347,7 +347,20 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     return paintNode
   }
   
-  @State var newRoomName:String = ""
+
+  struct ViewControllerRepresentation: UIViewControllerRepresentable {
+      var uiImage: UIImage?
+
+      func makeUIViewController(context: UIViewControllerRepresentableContext<ViewControllerRepresentation>) -> ViewController {
+          let controller = UIStoryboard(name: "Main", bundle: nil).instantiateViewController(withIdentifier: "ViewController") as! ViewController
+          controller.Image = self.uiImage
+          return controller
+      }
+
+      func updateUIViewController(_ uiViewController: ViewController, context: UIViewControllerRepresentableContext<ViewControllerRepresentation>) {
+
+      }
+  }
 
   
 }
